@@ -1,11 +1,13 @@
-# state-machine
+# State Machine
 
-Finite state machine implementation.""".
-
-Zero dependencies. Python 3.8+.
+Finite state machine with guards and actions.
 
 ## Usage
 
 ```bash
-python3 state_machine.py --help
+python3 state_machine.py
 ```
+
+## License
+
+MIT
