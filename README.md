@@ -1,6 +1,5 @@
 # state-machine
-Finite state machine with DSL-style definition. Zero dependencies.
-## Usage
+Finite state machine with guards/actions. Zero dependencies.
 ```bash
 python3 state_machine.py
 ```
