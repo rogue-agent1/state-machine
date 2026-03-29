@@ -1,35 +1,61 @@
 #!/usr/bin/env python3
-"""Finite state machine with guards and actions."""
+"""state_machine - Finite state machine framework."""
+import argparse, json
+
 class StateMachine:
-    def __init__(self,initial):
-        self.state=initial;self.transitions={};self.on_enter={};self.on_exit={};self.history=[]
-    def add_transition(self,from_state,event,to_state,guard=None,action=None):
-        self.transitions.setdefault(from_state,{})[event]={"to":to_state,"guard":guard,"action":action}
-    def add_enter(self,state,fn): self.on_enter[state]=fn
-    def add_exit(self,state,fn): self.on_exit[state]=fn
-    def send(self,event,**kwargs):
-        trans=self.transitions.get(self.state,{}).get(event)
-        if not trans: return False
-        if trans["guard"] and not trans["guard"](self.state,event,**kwargs): return False
-        old=self.state
-        if old in self.on_exit: self.on_exit[old](old,event)
-        if trans["action"]: trans["action"](old,event,**kwargs)
-        self.state=trans["to"]; self.history.append((old,event,self.state))
-        if self.state in self.on_enter: self.on_enter[self.state](self.state,event)
-        return True
-    def can(self,event):
-        return event in self.transitions.get(self.state,{})
-if __name__=="__main__":
-    sm=StateMachine("idle")
-    log=[]
-    sm.add_transition("idle","start","running",action=lambda s,e,**k:log.append("started"))
-    sm.add_transition("running","pause","paused")
-    sm.add_transition("paused","resume","running")
-    sm.add_transition("running","stop","idle")
-    sm.add_transition("paused","stop","idle")
-    sm.send("start"); assert sm.state=="running"
-    sm.send("pause"); assert sm.state=="paused"
-    sm.send("resume"); assert sm.state=="running"
-    sm.send("stop"); assert sm.state=="idle"
-    assert len(sm.history)==4; assert "started" in log
-    print(f"History: {sm.history}"); print("State machine OK")
+    def __init__(self, initial, transitions, accepting=None):
+        self.state = initial; self.initial = initial
+        self.transitions = transitions  # {(state, event): new_state}
+        self.accepting = accepting or set()
+        self.history = [initial]
+    def send(self, event):
+        key = (self.state, event)
+        if key in self.transitions:
+            old = self.state
+            self.state = self.transitions[key]
+            self.history.append(self.state)
+            return old, self.state
+        return self.state, None
+    def is_accepting(self): return self.state in self.accepting
+    def reset(self): self.state = self.initial; self.history = [self.initial]
+    def process(self, events):
+        results = []
+        for e in events:
+            old, new = self.send(e)
+            results.append({"event": e, "from": old, "to": new or old})
+        return results
+
+def main():
+    p = argparse.ArgumentParser(description="State machine")
+    p.add_argument("--demo", choices=["turnstile", "traffic", "vending"], default="turnstile")
+    p.add_argument("-e", "--events", nargs="+")
+    args = p.parse_args()
+    if args.demo == "turnstile":
+        sm = StateMachine("locked", {
+            ("locked", "coin"): "unlocked", ("unlocked", "push"): "locked",
+            ("locked", "push"): "locked", ("unlocked", "coin"): "unlocked"
+        })
+        events = args.events or ["push", "coin", "push", "push", "coin", "coin", "push"]
+    elif args.demo == "traffic":
+        sm = StateMachine("green", {
+            ("green", "timer"): "yellow", ("yellow", "timer"): "red",
+            ("red", "timer"): "green", ("red", "emergency"): "red",
+            ("green", "emergency"): "red", ("yellow", "emergency"): "red"
+        })
+        events = args.events or ["timer", "timer", "timer", "emergency", "timer", "timer"]
+    elif args.demo == "vending":
+        sm = StateMachine("idle", {
+            ("idle", "coin"): "has_coin", ("has_coin", "coin"): "has_two",
+            ("has_two", "select"): "dispensing", ("dispensing", "done"): "idle",
+            ("has_coin", "cancel"): "idle", ("has_two", "cancel"): "idle"
+        })
+        events = args.events or ["coin", "coin", "select", "done", "coin", "cancel"]
+    results = sm.process(events)
+    for r in results:
+        arrow = f"{r['from']} -> {r['to']}" if r['to'] != r['from'] else f"{r['from']} (no change)"
+        print(f"  [{r['event']:>10s}] {arrow}")
+    print(f"\nFinal state: {sm.state}")
+    print(f"History: {' -> '.join(sm.history)}")
+
+if __name__ == "__main__":
+    main()
