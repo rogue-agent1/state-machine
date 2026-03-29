@@ -1,13 +1,9 @@
-# State Machine Engine
+# state-machine2
 
-State Machine Engine — zero-dependency, single-file Python CLI.
+Finite state machine with guards and actions. Single-file Python CLI, zero dependencies.
 
 ## Usage
 
 ```bash
-python3 state_machine.py --help
+python3 state_machine.py
 ```
-
-## License
-
-MIT
